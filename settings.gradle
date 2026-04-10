@@ -1,0 +1,6 @@
+pluginManagement {
+    plugins {
+        id 'org.javacc.javacc' version '4.0.3'
+    }
+}
+rootProject.name = 'filter-query'

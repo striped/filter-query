@@ -1,0 +1,176 @@
+options {
+    STATIC = false;
+    UNICODE_INPUT = true;
+    MULTI = true;
+    KEEP_LINE_COLUMN = false;
+    NODE_PACKAGE = "org.kit.filter.query";
+    NODE_PREFIX = "";
+    NODE_USES_PARSER = true;
+    NODE_DEFAULT_VOID = true;
+    SINGLE_TREE_FILE = false;
+
+    // some performance optimizations
+    CACHE_TOKENS = true;
+    ERROR_REPORTING = true;
+    SUPPORT_CLASS_VISIBILITY_PUBLIC = false;
+}
+
+PARSER_BEGIN(FilterQuery)
+package org.kit.filter.query;
+
+import java.util.function.BiFunction;
+import java.io.StringReader;
+
+public class FilterQuery {
+
+    private BiFunction<?, String, ?> accessor;
+
+    private BiFunction<String, String, ?> coarser;
+
+    public FilterQuery withFieldResolver(BiFunction<?, String, ?> accessor) {
+        this.accessor = accessor;
+        return this;
+    }
+
+    public FilterQuery withValueCoarser(BiFunction<String, String, ?> coarser) {
+        this.coarser = coarser;
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    <T, I> BiFunction<T, String, I> resolver() {
+        return (BiFunction<T, String, I>) accessor;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <I> I coarse(String name, String value) {
+        return (I) coarser.apply(name, value);
+    }
+}
+PARSER_END(FilterQuery)
+
+SKIP :
+{
+    " "
+|   "\t"
+|   "\f"
+|   "\n"
+|   "\r"
+|   <"/*" (~["*"])* "*" (~["/"] (~["*"])* "*")* "/">
+}
+
+TOKEN [IGNORE_CASE] :
+{
+    <AND: "AND">
+|   <OR: "OR">
+|   <NOT: "NOT">
+|   <LPAREN: "(">
+|   <RPAREN: ")">
+|   <EQ: ("=" | "==")>
+|   <GT: ">">
+|   <LT: "<">
+|   <CONTAINS: "CONTAINS">
+|   <BETWEEN: "BETWEEN">
+|   <IN: "IN">
+|   <COMMA: ",">
+}
+
+TOKEN : /* LITERALS */
+{
+    <NUMERIC_LITERAL: (<PLUS> | <MINUS>)? (<DIGIT>)+ ("." (<DIGIT>)+)?>
+|   <#MINUS: "-">
+|   <#PLUS: "+">
+|   <STRING_LITERAL: "'" (~["'"])* "'">
+}
+
+TOKEN : /* IDENTIFIERS */
+{
+    <IDENTIFIER: <LETTER> (<LETTER> | <DIGIT>)*>
+|   <#LETTER: ["_", "a"-"z", "A"-"Z"]>
+|   <#DIGIT: ["0"-"9"]>
+}
+
+Expression parse() #Expression : {}
+{
+    orExpression() <EOF>
+    { return jjtThis; }
+}
+
+void orExpression() #void : {}
+{
+    (
+        andExpression() (<OR> andExpression())*
+    ) #Or(>1)
+}
+
+void andExpression() #void : {}
+{
+    (
+        unaryExpression() (<AND> unaryExpression())*
+    ) #And(>1)
+}
+
+void unaryExpression() #void :
+{}
+{
+    <NOT> phrase() #Not
+|   phrase()
+}
+
+void phrase() #void : {}
+{
+    LOOKAHEAD(2) equal()
+|   LOOKAHEAD(2) greater()
+|   LOOKAHEAD(2) lesser()
+|   LOOKAHEAD(2) contains()
+|   LOOKAHEAD(2) between()
+|   LOOKAHEAD(2) in()
+|    <LPAREN> orExpression() <RPAREN>
+}
+
+void equal() #Equal : {}
+{
+    value() <EQ> value()
+}
+
+void greater() #Greater : {}
+{
+    value() <GT> value()
+}
+
+void lesser() #Less : {}
+{
+    value() <LT> value()
+}
+
+void contains() #Contains : {}
+{
+    value() <CONTAINS> value()
+}
+
+void between() #Between : {}
+{
+    value() <BETWEEN>  literal() <AND> literal()
+}
+
+void in() #In : {}
+{
+    value() <IN> <LPAREN> literal() (<COMMA> literal())* <RPAREN>
+}
+
+void value() #void : {}
+{
+    literal()
+|   identifier()
+}
+
+void identifier() #Field : {}
+{
+    <IDENTIFIER>
+}
+
+void literal() #Literal : {}
+{
+    <NUMERIC_LITERAL>
+|   <STRING_LITERAL>
+}

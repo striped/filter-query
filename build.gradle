@@ -1,0 +1,53 @@
+plugins {
+	id 'java'
+	id "org.javacc.javacc"
+	id 'idea'
+}
+
+repositories {
+	mavenLocal()
+	mavenCentral()
+}
+
+dependencies {
+	javacc("org.javacc.generator:java:${project.'javacc.version'}")
+
+	testImplementation(platform("org.junit:junit-bom:${project.'junit-jupiter.version'}"))
+	testImplementation('org.junit.jupiter:junit-jupiter')
+	testImplementation 'org.mockito:mockito-inline:+'
+	testRuntimeOnly('org.junit.platform:junit-platform-launcher')
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir 'build/generated/sources/javacc/main/java'
+		}
+	}
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+compileJjtree {
+	outputDirectory = project.layout.buildDirectory.file('generated/sources/javacc/main/java/com/fundrecs/filter/query').get().asFile
+	arguments = [grammar_encoding: 'UTF-8']
+}
+
+compileJavacc {
+	outputDirectory = project.layout.buildDirectory.file('generated/sources/javacc/main/java/com/fundrecs/filter/query').get().asFile
+}
+
+compileJava {
+    options.compilerArgs << '-parameters'
+}
+
+test {
+	useJUnitPlatform()
+	testLogging {
+		events "passed", "skipped", "failed"
+	}
+}
